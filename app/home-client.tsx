@@ -1,107 +1,90 @@
 "use client"
+// ─────────────────────────────────────────────
+// app/home-client.tsx — v6
+// ─────────────────────────────────────────────
+// Wires together:
+//   • Orientation detection (portrait/landscape)
+//   • Long press gated by longPressToEdit setting
+//   • Settings panel (drawer, all 4 tabs)
+//   • Connectivity bar (top-right shortcut pills)
+//   • Bento dashboard (responsive, drag/resize)
+//   • Status bar + dock
 
-import { useRef, useEffect } from "react"
-import SmartDock from "@/components/dock"
-import DockPanels from "@/components/dock-panels"
-import GridOverlay from "@/components/grid-overlay"
-import WidgetRenderer from "@/components/widget-renderer"
-import { useOrientation } from "./hooks/useOrientation"
-import { useLauncherStore } from "./store/launcher-store"
+import { useEffect }         from "react"
+import { useTheme }          from "@/app/theme/theme-context"
+import { useLauncherStore }  from "@/app/store/launcher-store"
+import { useSettingsStore }  from "@/app/store/settings-store"
+import { useLongPress }      from "@/app/hooks/useLongPress"
+import { useOrientation }    from "@/app/hooks/useOrientation"
+import StatusBar             from "@/components/grid/status-bar"
+import SmartDock             from "@/components/dock/smart-dock"
+import BentoDashboard        from "@/components/bento/bento-dashboard"
+import SettingsPanel         from "@/components/settings/settings-panel"
+import ConnectivityBar       from "@/components/settings/connectivity-bar"
+import EditModeBadge         from "@/components/grid/edit-mode-badge"
+import LaunchOverlay         from "@/components/apps/launch-overlay"
 
 export default function HomeClient() {
+  const t             = useTheme()
+  const isEditMode    = useLauncherStore(s => s.isEditMode)
+  const setEditMode   = useLauncherStore(s => s.setEditMode)
+  const toggleEdit    = useLauncherStore(s => s.toggleEditMode)
+  const longPressToEdit = useSettingsStore(s => s.longPressToEdit)
+
+  // Live orientation tracking
   useOrientation()
 
-  const toggleEditMode = useLauncherStore((s) => s.toggleEditMode)
-  const isEditMode = useLauncherStore((s) => s.isEditMode)
-  const orientation = useLauncherStore((s) => s.orientation)
-  const layoutPortrait = useLauncherStore((s) => s.layoutPortrait)
-  const layoutLandscape = useLauncherStore((s) => s.layoutLandscape)
-
-  const timer = useRef<NodeJS.Timeout | null>(null)
-  const longPressTriggered = useRef(false)
-
-  const layout =
-    orientation === "portrait" ? layoutPortrait : layoutLandscape
-
-  /* ---------------- DEBUG ---------------- */
-
-  useEffect(() => {
-    console.log("✏️ Edit mode:", isEditMode)
-  }, [isEditMode])
-
-  useEffect(() => {
-    console.log("🧭 Orientation:", orientation)
-    console.log("🧩 Active layout:", layout)
-  }, [orientation, layout])
-
-  /* ---------------- ESC EXIT ---------------- */
-
+  // Escape to exit edit/settings
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isEditMode) {
-        console.log("⎋ ESC → exit edit mode")
-        toggleEditMode()
-      }
+      if (e.key === "Escape") setEditMode(false)
     }
-
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
-  }, [isEditMode, toggleEditMode])
+  }, [setEditMode])
 
-  /* ---------------- UI ---------------- */
+  // Long press — only enabled if longPressToEdit setting is ON
+  const longPress = useLongPress({
+    onLongPress: () => { if (!isEditMode) toggleEdit() },
+    onClick:     () => { if (isEditMode) setEditMode(false) },
+    disabled: !longPressToEdit,  // ← key safety gate
+  })
 
   return (
     <main
       className="w-screen h-screen overflow-hidden relative select-none"
-      onMouseDown={() => {
-        if (isEditMode) return
-
-        longPressTriggered.current = false
-
-        timer.current = setTimeout(() => {
-          console.log("⏱️ Long press → ENTER edit mode")
-          toggleEditMode()
-          longPressTriggered.current = true
-        }, 600)
+      style={{
+        background:  t.bg,
+        fontFamily: "'Outfit', 'Segoe UI', sans-serif",
       }}
-      onMouseUp={() => {
-        if (timer.current) clearTimeout(timer.current)
-      }}
-      onMouseLeave={() => {
-        if (timer.current) clearTimeout(timer.current)
-      }}
-      onClick={() => {
-        if (longPressTriggered.current) {
-          longPressTriggered.current = false
-          return
-        }
-
-        if (isEditMode) {
-          console.log("🖱 Click → EXIT edit mode")
-          toggleEditMode()
-        }
-      }}
+      {...longPress}
     >
-      {/* EDIT BADGE */}
-      {isEditMode && (
-        <div className="absolute top-4 left-4 z-[999] bg-red-500 text-white px-3 py-1 rounded">
-          EDIT MODE
-        </div>
-      )}
+      {/* Ambient background mesh */}
+      <div style={{ position:"absolute", inset:0, background:t.bgMesh, pointerEvents:"none", zIndex:0 }} />
 
-      {/* GRID */}
-      <GridOverlay />
+      {/* Film grain noise overlay */}
+      <div style={{
+        position:"absolute", inset:0, pointerEvents:"none", zIndex:1, opacity:.022,
+        backgroundImage:`url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+        backgroundSize:"160px 160px",
+      }} />
 
-      {/* WIDGETS */}
-      {layout.map((widget) => (
-        <WidgetRenderer key={widget.id} widget={widget} />
-      ))}
-
-      {/* PANELS */}
-      <DockPanels />
-
-      {/* DOCK */}
+      {/* ── Fixed chrome ── */}
+      <StatusBar />
       <SmartDock />
+
+      {/* ── Dashboard ── */}
+      <BentoDashboard />
+
+      {/* ── Connectivity quick-access bar ── */}
+      <ConnectivityBar />
+
+      {/* ── Overlays ── */}
+      <EditModeBadge />
+      <LaunchOverlay />
+
+      {/* ── Settings drawer ── */}
+      <SettingsPanel />
     </main>
   )
 }

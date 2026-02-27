@@ -8,7 +8,7 @@ export default function GridOverlay() {
   if (!isEditMode) return null
 
   return (
-    <div className="absolute inset-0 grid grid-cols-4 grid-rows-6 gap-2 p-2 pointer-events-none z-0">
+    <div className="absolute inset-0 pointer-events-none z-0">
       {Array.from({ length: 24 }).map((_, i) => (
         <div
           key={i}

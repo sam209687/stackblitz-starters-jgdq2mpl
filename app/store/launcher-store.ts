@@ -1,109 +1,83 @@
 "use client"
+// ─────────────────────────────────────────────
+// app/store/launcher-store.ts
+// ─────────────────────────────────────────────
 
 import { create } from "zustand"
-
-export type WidgetInstance = {
-  id: string
-  type: string
-  x: number
-  y: number
-  w: number
-  h: number
-  config?: any
-}
+import type {
+  PageInstance,
+  FolderInstance,
+  DraggingState,
+  ResizingState,
+  LaunchingApp,
+} from "@/types/launcher"
+import { INITIAL_PAGES } from "@/app/engine/initial-data"
 
 type LauncherState = {
-  isEditMode: boolean
-  isPro: boolean
-  orientation: "portrait" | "landscape"
+  pages: PageInstance[]
+  setPages: (updater: (prev: PageInstance[]) => PageInstance[]) => void
 
-  layoutPortrait: WidgetInstance[]
-  layoutLandscape: WidgetInstance[]
+  folders: FolderInstance[]
+  setFolders: (updater: (prev: FolderInstance[]) => FolderInstance[]) => void
+
+  currentPage: number
+  setCurrentPage: (page: number | ((prev: number) => number)) => void
+
+  isEditMode: boolean
+  toggleEditMode: () => void
+  setEditMode: (val: boolean) => void
+
+  orientation: "portrait" | "landscape"
+  setOrientation: (o: "portrait" | "landscape") => void
+
+  dragging: DraggingState | null
+  setDragging: (d: DraggingState | null) => void
+
+  resizing: ResizingState | null
+  setResizing: (r: ResizingState | null) => void
+
+  dropTarget: string | null
+  setDropTarget: (id: string | null) => void
+
+  launchingApp: LaunchingApp | null
+  setLaunchingApp: (app: LaunchingApp | null) => void
 
   activeDockApp: string | null
   setActiveDockApp: (id: string | null) => void
-
-  // ✅ DRAG ENGINE
-  draggingWidgetId: string | null
-  setDraggingWidgetId: (id: string | null) => void
-
-  toggleEditMode: () => void
-  setOrientation: (o: "portrait" | "landscape") => void
-
-  addWidget: (w: WidgetInstance) => void
-  updateWidget: (id: string, data: Partial<WidgetInstance>) => void
-  removeWidget: (id: string) => void
 }
 
-export const useLauncherStore = create<LauncherState>((set, get) => ({
+export const useLauncherStore = create<LauncherState>((set) => ({
+  pages: INITIAL_PAGES,
+  setPages: (updater) => set((s) => ({ pages: updater(s.pages) })),
+
+  folders: [],
+  setFolders: (updater) => set((s) => ({ folders: updater(s.folders) })),
+
+  currentPage: 0,
+  setCurrentPage: (page) =>
+    set((s) => ({
+      currentPage: typeof page === "function" ? page(s.currentPage) : page,
+    })),
+
   isEditMode: false,
-  isPro: false,
+  toggleEditMode: () => set((s) => ({ isEditMode: !s.isEditMode })),
+  setEditMode: (val) => set({ isEditMode: val }),
+
   orientation: "landscape",
+  setOrientation: (o) => set({ orientation: o }),
 
-  layoutPortrait: [],
+  dragging: null,
+  setDragging: (d) => set({ dragging: d }),
 
-  // ✅ TEST WIDGET (drag visibility)
-  layoutLandscape: [
-    {
-      id: "clock1",
-      type: "clock",
-      x: 1,
-      y: 1,
-      w: 3,
-      h: 2,
-    },
-  ],
+  resizing: null,
+  setResizing: (r) => set({ resizing: r }),
+
+  dropTarget: null,
+  setDropTarget: (id) => set({ dropTarget: id }),
+
+  launchingApp: null,
+  setLaunchingApp: (app) => set({ launchingApp: app }),
 
   activeDockApp: null,
   setActiveDockApp: (id) => set({ activeDockApp: id }),
-
-  draggingWidgetId: null,
-  setDraggingWidgetId: (id) => {
-    console.log("🟡 draggingWidgetId:", id)
-    set({ draggingWidgetId: id })
-  },
-
-  toggleEditMode: () =>
-    set((state) => ({
-      isEditMode: !state.isEditMode,
-    })),
-
-  setOrientation: (o) => set({ orientation: o }),
-
-  addWidget: (widget) => {
-    const key =
-      get().orientation === "portrait"
-        ? "layoutPortrait"
-        : "layoutLandscape"
-
-    set({
-      [key]: [...get()[key], widget],
-    } as Pick<LauncherState, "layoutPortrait" | "layoutLandscape">)
-  },
-
-  updateWidget: (id, data) => {
-    console.log("🧠 updateWidget:", id, data)
-
-    const key =
-      get().orientation === "portrait"
-        ? "layoutPortrait"
-        : "layoutLandscape"
-
-    set({
-      [key]: get()[key].map((w) =>
-        w.id === id ? { ...w, ...data } : w
-      ),
-    } as Pick<LauncherState, "layoutPortrait" | "layoutLandscape">)
-  },
-
-  removeWidget: (id) => {
-    const key =
-      get().orientation === "portrait"
-        ? "layoutPortrait"
-        : "layoutLandscape"
-
-    set({
-      [key]: get()[key].filter((w) => w.id !== id),
-    } as Pick<LauncherState, "layoutPortrait" | "layoutLandscape">)
-  },
 }))
